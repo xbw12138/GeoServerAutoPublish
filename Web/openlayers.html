@@ -1,0 +1,535 @@
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="imagetoolbar" content="no">
+    <title>遥感监测Demo</title>
+    <link rel="stylesheet" href="assets/css/main.css" type="text/css">
+    <script src="assets/js/jquery.min.js"></script>
+    <script src="assets/js/ol.js"></script>
+    <link rel='stylesheet' href='assets/css/ol.css' type='text/css'>
+    <script src="assets/js/ol3-layerswitcher.js"></script>
+    <link rel="stylesheet" href="assets/css/ol3-layerswitcher.css" type="text/css">
+    <!-- 参数 -->
+    <script type="text/javascript">
+        var keyLabel = {
+            'blackodor': '黑臭水体',
+            'nwater': '正常水体',
+            'water': '水体',
+            'city': '建设用地',
+            'veg': '植被',
+            'soil': '裸土',
+            'soi': '裸土',
+            'crop': '庄稼'
+        }
+
+        var baseSource = {
+            base: {
+                url: 'http://t0.tianditu.com/DataServer?T=img_w&x={x}&y={y}&l={z}&tk=4f62e1d82bd46e2ff470b291c2260156',
+                name: '地图'
+            },
+            label: {
+                url: 'http://t0.tianditu.com/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=4f62e1d82bd46e2ff470b291c2260156',
+                name: '注记'
+            },
+            river: "http://wsl:6075/basic_query/river_query/river_jjj"
+        }
+    </script>
+
+    <!-- 初始化地图 -->
+    <script type="text/javascript">
+        var projection = new ol.proj.Projection({
+            code: 'EPSG:4326',
+            units: 'degrees',
+            axisOrientation: 'neu'
+        });
+        var gridsetName = 'EPSG:4326';
+        //切片名
+        var gridNames = ['EPSG:4326:0', 'EPSG:4326:1', 'EPSG:4326:2', 'EPSG:4326:3', 'EPSG:4326:4', 'EPSG:4326:5', 'EPSG:4326:6', 'EPSG:4326:7', 'EPSG:4326:8', 'EPSG:4326:9', 'EPSG:4326:10', 'EPSG:4326:11', 'EPSG:4326:12', 'EPSG:4326:13', 'EPSG:4326:14', 'EPSG:4326:15', 'EPSG:4326:16', 'EPSG:4326:17', 'EPSG:4326:18', 'EPSG:4326:19', 'EPSG:4326:20', 'EPSG:4326:21'];
+        //切片大小
+        var resolutions = [0.703125, 0.3515625, 0.17578125, 0.087890625, 0.0439453125, 0.02197265625, 0.010986328125, 0.0054931640625, 0.00274658203125, 0.001373291015625, 6.866455078125E-4, 3.4332275390625E-4, 1.71661376953125E-4, 8.58306884765625E-5, 4.291534423828125E-5, 2.1457672119140625E-5, 1.0728836059570312E-5, 5.364418029785156E-6, 2.682209014892578E-6, 1.341104507446289E-6, 6.705522537231445E-7, 3.3527612686157227E-7];
+
+        $(function () {
+            function ScaleControl(opt_options) {
+                var options = opt_options || {};
+
+                var element = document.createElement('div');
+                element.setAttribute('id', 'scale');
+                element.className = 'ol-scale-value';
+
+                ol.control.Control.call(this, {
+                    element: element,
+                    target: options.target
+                });
+            };
+            ol.inherits(ScaleControl, ol.control.Control);
+            ScaleControl.prototype.setMap = function (map) {
+                map.on('postrender', function () {
+                    var view = map.getView();
+                    var resolution = view.getResolution();
+                    var dpi = 90.71428571428572;
+                    var mpu = map.getView().getProjection().getMetersPerUnit();
+                    var scale = resolution * mpu * 39.37 * dpi;
+
+                    if (scale >= 9500 && scale <= 950000) {
+                        scale = Math.round(scale / 1000) + 'K';
+                    } else if (scale >= 950000) {
+                        scale = Math.round(scale / 1000000) + 'M';
+                    } else {
+                        scale = Math.round(scale);
+                    }
+                    document.getElementById('scale').innerHTML = 'Scale = 1 : ' + scale;
+                }, this);
+                ol.control.Control.prototype.setMap.call(this, map);
+            }
+
+            function ZoomControl(opt_options) {
+                var options = opt_options || {};
+
+                var element = document.createElement('div');
+                element.setAttribute('id', 'zoom');
+                element.className = 'ol-zoom-value';
+
+                ol.control.Control.call(this, {
+                    element: element,
+                    target: options.target
+                });
+
+            };
+            ol.inherits(ZoomControl, ol.control.Control);
+            ZoomControl.prototype.setMap = function (map) {
+                map.on('moveend', function () {
+                    var view = map.getView();
+                    document.getElementById('zoom').innerHTML = 'Zoom level = ' + view.getZoom();
+                }, this);
+                ol.control.Control.prototype.setMap.call(this, map);
+            }
+
+            var view = new ol.View({
+                center: [0, 0],
+                zoom: 2,
+                projection: projection,
+                extent: [-180.0, -90.0, 180.0, 90.0]
+            });
+
+            map = new ol.Map({
+                controls: ol.control.defaults({ attribution: false }).extend([
+                    new ol.control.MousePosition(),
+                    new ScaleControl(),
+                    new ZoomControl()
+                ]),
+                layers: [],
+                target: 'map',
+                view: view
+            });
+
+            // 这个默认边界不用改
+            map.getView().fit([116.72650652077483, 39.6152906023194, 117.18901780224532, 39.9895594296541], map.getSize());
+
+            // 创建图层
+            layerBase = getlayerBase(baseSource.base.url, baseSource.base.name);
+            map.addLayer(layerBase);
+
+            layerLabel = getlayerLabel(baseSource.label.url, baseSource.label.name);
+            map.addLayer(layerLabel);
+
+            // 添加多条河流图层
+            map.addLayer(getlayerRiver(baseSource.river));
+
+            // 图层选择
+            map.addControl(new ol.control.LayerSwitcher());
+            // 图层事件
+            setEventPopup(map);
+        });
+    </script>
+
+    <!-- 创建图层 -->
+    <script type="text/javascript">
+        // 创建地图图层
+        function getlayerBase(url, title) {
+            return new ol.layer.Tile({
+                title: title,
+                type: 'base',
+                visible: true,
+                source: new ol.source.XYZ({
+                    url: url,
+                    wrapX: false
+                })
+            });
+        }
+
+        // 创建注记图层
+        function getlayerLabel(url, title) {
+            return new ol.layer.Tile({
+                title: title,
+                visible: true,
+                source: new ol.source.XYZ({
+                    url: url,
+                    wrapX: false
+                })
+            });
+        }
+
+        // 获取河流绘制风格
+        function getRiverStyle(title) {
+            return new ol.style.Style({
+                stroke: new ol.style.Stroke({ //边界样式
+                    color: '#0000FF',
+                    width: 2
+                }),
+                // text: new ol.style.Text({
+                //     text: title,
+                //     fill: new ol.style.Fill({ color: '#aa3300' }),
+                //     stroke: new ol.style.Stroke({ color: '#ffcc33', width: 2 })
+                // })
+            });
+        }
+
+        // 创建河流图层
+        function getlayerRiver(url) {
+            $.ajax({
+                url: url,
+                type: "GET",
+                dataType: "json",
+                async: false,
+                success: function (data) {
+                    layerRiverArray = []
+                    $.each(data.resData, function (i, item) {
+                        layerRiverArray.push(
+                            new ol.layer.Vector({
+                                title: item.properties.name,
+                                source: new ol.source.Vector({
+                                    features: (new ol.format.GeoJSON()).readFeatures(item)
+                                }),
+                                style: getRiverStyle(item.properties.name)
+                            })
+                        )
+                    });
+                }
+            });
+
+            return new ol.layer.Group({
+                title: '京津冀河流',
+                layers: layerRiverArray
+            });
+        }
+
+        // 创建遥感图层
+        function getlayerYaogan(url, title, layerName) {
+            //设置地图投影
+            return new ol.layer.Tile({
+                title: title,
+                visible: true,
+                source: new ol.source.WMTS({
+                    url: url,
+                    layer: layerName,
+                    matrixSet: gridsetName,
+                    format: 'image/png',
+                    projection: projection,
+                    //切片信息
+                    tileGrid: new ol.tilegrid.WMTS({
+                        tileSize: [256, 256],
+                        extent: [-180.0, -90.0, 180.0, 90.0],//范围
+                        origin: [-180.0, 90.0],
+                        resolutions: resolutions,
+                        matrixIds: gridNames
+                    }),
+                    wrapX: true
+                })
+            });
+        }
+
+        // 创建marker图层
+        function getlayerMarker(featuerInfo) {
+            var createLabelStyle = getcreateLabelStyle();
+            var iconFeature = new ol.Feature({
+                //坐标点
+                geometry: new ol.geom.Point(featuerInfo.marker),
+                //名称属性
+                name: featuerInfo.name,
+            });
+            iconFeature.setStyle(createLabelStyle(iconFeature));
+
+            //矢量标注图层
+            return new ol.layer.Vector({
+                title: featuerInfo.name,
+                visible: true,
+                source: new ol.source.Vector({
+                    features: [iconFeature]
+                })
+            });
+        }
+    </script>
+
+    <!-- 创建marker -->
+    <script type="text/javascript">
+        // 图标样式
+        function getcreateLabelStyle() {
+            return function (feature) {
+                return new ol.style.Style({
+                    image: new ol.style.Icon(
+                        /** @type {olx.style.IconOptions} */
+                        {
+                            //设置图标点
+                            anchor: [0.5, 60],
+                            //图标起点
+                            anchorOrigin: 'top-right',
+                            //指定x值为图标点的x值
+                            anchorXUnits: 'fraction',
+                            //指定Y值为像素的值
+                            anchorYUnits: 'pixels',
+                            //偏移
+                            offsetOrigin: 'top-right',
+                            // offset:[0,10],
+                            //图标缩放比例
+                            scale: 0.5,
+                            //透明度
+                            opacity: 1.0,
+                            //图标的url
+                            src: 'assets/image/marker.png'
+                        }),
+                    // text: new ol.style.Text({
+                    //     //位置
+                    //     textAlign: 'center',
+                    //     //基准线
+                    //     textBaseline: 'middle',
+                    //     //文字样式
+                    //     font: 'normal 14px 微软雅黑',
+                    //     //文本内容
+                    //     text: feature.get('name'),
+                    //     //文本填充样式（即文字颜色）
+                    //     fill: new ol.style.Fill({ color: '#aa3300' }),
+                    //     stroke: new ol.style.Stroke({ color: '#ffcc33', width: 2 })
+                    // })
+                });
+            }
+        }
+
+        function setEventPopup(map) {
+            var container = document.getElementById("popup");
+            var content = document.getElementById("popup-content");
+            var popupCloser = document.getElementById("popup-closer");
+
+            var overlay = new ol.Overlay({
+                element: container,
+                autoPan: true
+            });
+
+            map.on('click', function (e) {
+                var pixel = map.getEventPixel(e.originalEvent);
+                map.forEachFeatureAtPixel(pixel, function (feature) {
+                    var coodinate = e.coordinate;
+                    content.innerHTML = '<p class="markerText">' + feature.values_.name + '</p><br><p>' + coodinate + '</p>';
+                    overlay.setPosition(coodinate);
+                    map.addOverlay(overlay);
+                });
+            });
+
+            popupCloser.addEventListener('click', function () {
+                overlay.setPosition(undefined);
+            });
+        }
+    </script>
+
+    <!-- 获取边界 -->
+    <script type="text/javascript">
+        function getBound(url) {
+            $.ajax({
+                type: "GET",
+                url: url,
+                dataType: "json",
+                async: false,
+                success: function (data) {
+                    array_bound = [data.resData.minx, data.resData.miny, data.resData.maxx, data.resData.maxy]
+                }
+            });
+            return array_bound;
+        }
+    </script>
+
+    <!-- 获取marker数据 -->
+    <script type="text/javascript">
+        function getMarker(url) {
+            $.ajax({
+                type: "GET",
+                url: url,
+                dataType: "json",
+                async: false,
+                success: function (data) {
+                    markerArray = []
+                    $.each(data.resData.resList, function (i, item) {
+                        markerArray.push({
+                            "id": item.waterCode,
+                            "name": item.waterName,
+                            "marker": [item.longitude, item.latitude]
+                        })
+                    });
+                }
+            });
+            return markerArray;
+        }
+    </script>
+
+    <!-- 图例 -->
+    <script type="text/javascript">
+        // 创建图例
+        // isGradient 是否是渐变色
+        function getLegend(url, layer, isGradient) {
+            $.ajax({
+                type: "GET",
+                url: url + layer,
+                dataType: "json",
+                success: function (data) {
+                    var label_array = data.Legend[0].rules[0].symbolizers[0].Raster.colormap.entries;
+                    // 图例分为渐变与正常图例
+                    if (isGradient) {
+                        var background_image = "linear-gradient(";
+                        var startValue = "";
+                        var endValue = "";
+                        $.each(label_array, function (i, item) {
+                            if (item.opacity == "1.0") {
+                                if (item.label != "") {
+                                    if (startValue == "") {
+                                        startValue = item.label;
+                                    } else if (startValue != "" && endValue == "") {
+                                        endValue = item.label;
+                                    }
+                                }
+                                background_image += item.color;
+                                background_image += ",";
+                            }
+                        });
+                        $("#table").html('');
+                        $("#label").css("background-image", background_image.substr(0, background_image.length - 1) + ")");
+                        $("#label_min").text(startValue);
+                        $("#label_max").text(endValue);
+                    } else {
+                        $("#table").html('');
+                        $.each(label_array, function (i, item) {
+                            if (item.opacity == "1.0") {
+                                $("#table").append($('<tr><td style="background-color: ' + item.color + ';">' + keyLabel[item.label] + '</td></tr>'));
+                            }
+                        });
+                        $("#label").removeAttr("style");
+                        $("#label_min").text("");
+                        $("#label_max").text("");
+                    }
+                }
+            });
+        }
+    </script>
+    <script type="text/javascript">
+        // 创建图层
+        function createLayer(workspace, layer, name, isGradient, markerData) {
+            var mapSource = {
+                legend: {
+                    url: 'http://wsl:6079/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=application/json&STRICT=false&style=',
+                    layer: workspace + ':' + layer,
+                    isGradient: isGradient,
+                },
+                yaogan: {
+                    url: 'http://wsl:6079/geoserver/gwc/service/wmts',
+                    name: name + layer,
+                    layer: workspace + ':' + layer
+                },
+                bound: 'http://wsl:6075/public/geo_bound/bound?workspace=' + workspace + '&layer=' + layer
+            }
+
+            // 清除图层
+            try {
+                map.removeLayer(layerYaogan);
+                map.removeLayer(layerMarker);
+            } catch (e) {
+
+            }
+            // 遥感影像图层
+            layerYaogan = getlayerYaogan(mapSource.yaogan.url, mapSource.yaogan.name, mapSource.yaogan.layer);
+            map.addLayer(layerYaogan);
+            // 获取图例, 渐变图例，用于特征污染物空间分布
+            getLegend(mapSource.legend.url, mapSource.legend.layer, mapSource.legend.isGradient)
+            // 移动镜头
+            map.getView().fit(getBound(mapSource.bound), map.getSize());
+
+            // 创建marker
+            layerMarkerGroup = []
+            markerData.forEach(val => {
+                layerMarkerGroup.push(getlayerMarker(val))
+            });
+            layerMarker = new ol.layer.Group({
+                title: '标记点',
+                layers: layerMarkerGroup
+            })
+            map.addLayer(layerMarker);
+            layerMarker.setVisible(false);
+            layerMarker.setVisible(true);
+        }
+
+        // 切换数据
+        function change1() {
+            var name = '特征污染物';
+            var workspace = 'inversion';
+            var indicator = 'BOD5';
+            var cityName = '三河市';
+            var cityCode = '131082';
+            var time = '2019-11-04';
+            var layer = cityCode + '_' + indicator + '_' + time;
+            var isGradient = true;
+            var markerData = getMarker('http://wsl:6075/remote_sensing/water_pollution/search?belong=' + cityName + '&time=' + time + '&pageSize=30')
+            createLayer(workspace, layer, name, isGradient, markerData)
+        }
+        function change2() {
+            var name = '水体面积&土地利用';
+            var workspace = 'landcover';
+            var cityCode = '131082';
+            var time = '2018';
+            var layer = cityCode + '_' + time;
+            var isGradient = false;
+            var markerData = []
+            createLayer(workspace, layer, name, isGradient, markerData)
+        }
+        function change3() {
+            var name = '黑臭水体';
+            var workspace = 'blackodor';
+            var cityCode = '131082';
+            var time = '2018';
+            var layer = cityCode + '_' + time;
+            var isGradient = false;
+            var markerData = []
+            createLayer(workspace, layer, name, isGradient, markerData)
+        }
+        function change4() {
+            var name = '河湖缓冲带';
+            var workspace = 'bufferstrip';
+            var cityCode = '100000';
+            var river = 'BDG';
+            var time = '2019';
+            var layer = cityCode + '_' + river + '_' + time;
+            var isGradient = false;
+            var markerData = []
+            createLayer(workspace, layer, name, isGradient, markerData)
+        }
+    </script>
+</head>
+
+<body>
+    <button onclick="change1()">特征污染物</button>
+    <button onclick="change2()">水体面积&土地利用</button>
+    <button onclick="change3()">黑臭水体</button>
+    <button onclick="change4()">河湖缓冲带</button>
+    <!-- Content here -->
+    <div id="map">
+        <div id="popup" class="ol-popup">
+            <a href="#" id="popup-closer" class="ol-popup-closer"></a>
+            <div id="popup-content">
+            </div>
+        </div>
+    </div>
+    <div id="labels">
+        <div id="label" class="my-label-value">
+            <table id="table" style="background-color:azure;"></table>
+        </div>
+        <label id="label_min" class="my-label-min-value"></label>
+        <label id="label_max" class="my-label-max-value"></label>
+    </div>
+</body>
+
+</html>
