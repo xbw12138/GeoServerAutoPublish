@@ -246,6 +246,7 @@
                 geometry: new ol.geom.Point(featuerInfo.marker),
                 //名称属性
                 name: featuerInfo.name,
+                id: featuerInfo.id
             });
             iconFeature.setStyle(createLabelStyle(iconFeature));
 
@@ -318,7 +319,7 @@
                 var pixel = map.getEventPixel(e.originalEvent);
                 map.forEachFeatureAtPixel(pixel, function (feature) {
                     var coodinate = e.coordinate;
-                    content.innerHTML = '<p class="markerText">' + feature.values_.name + '</p><br><p>' + coodinate + '</p>';
+                    content.innerHTML = '<p class="markerText">' + feature.values_.name + ' ' + feature.values_.id + '</p><br><p>' + coodinate + '</p>';
                     overlay.setPosition(coodinate);
                     map.addOverlay(overlay);
                 });

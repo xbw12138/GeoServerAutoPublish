@@ -103,7 +103,7 @@
         var ul = document.createElement('ul');
         this.panel.appendChild(ul);
         this.renderLayers_(this.getMap(), ul);
-
+        this.renderChecks_(this.getMap());
     };
 
     /**
@@ -151,6 +151,17 @@
     ol.control.LayerSwitcher.prototype.setVisible_ = function(lyr, visible) {
         var map = this.getMap();
         lyr.setVisible(visible);
+        if (lyr.getLayers && !lyr.get('combine')) {
+            var lyrs = lyr.getLayers().getArray().slice().reverse();
+            for (var i = 0, l; i < lyrs.length; i++) {
+                document.getElementById(lyrs[i].get('input_id')).checked=visible;
+                parentLayer = lyrs[i].get('parent_layer');
+                if(!parentLayer.getVisible()){
+                    parentLayer.setVisible(true);
+                }
+                lyrs[i].setVisible(visible);
+            }
+        }
         if (visible && lyr.get('type') === 'base') {
             // Hide all other base layers regardless of grouping
             ol.control.LayerSwitcher.forEachRecursive(map, function(l, idx, a) {
@@ -167,15 +178,15 @@
      * @param {ol.layer.Base} lyr Layer to be rendered (should have a title property).
      * @param {Number} idx Position in parent group list.
      */
-    ol.control.LayerSwitcher.prototype.renderLayer_ = function(lyr, idx) {
+    ol.control.LayerSwitcher.prototype.renderLayer_ = function(lyr, idx, parentLayer) {
 
         var this_ = this;
-
         var li = document.createElement('li');
 
         var lyrTitle = lyr.get('title');
         var lyrId = ol.control.LayerSwitcher.uuid();
-
+        lyr.set('input_id', lyrId);
+        lyr.set('parent_layer', parentLayer);
         var label = document.createElement('label');
 
         if (lyr.getLayers && !lyr.get('combine')) {
@@ -192,6 +203,7 @@
             input.checked = lyr.get('visible');
             input.onchange = function(e) {
                 this_.setVisible_(lyr, e.target.checked);
+                this_.renderChecks_(this_.getMap());
             };
             li.appendChild(input);
 
@@ -218,6 +230,7 @@
             input.checked = lyr.get('visible');
             input.onchange = function(e) {
                 this_.setVisible_(lyr, e.target.checked);
+                this_.renderChecks_(this_.getMap());
             };
             li.appendChild(input);
 
@@ -248,7 +261,29 @@
         for (var i = 0, l; i < lyrs.length; i++) {
             l = lyrs[i];
             if (l.get('title')) {
-                elm.appendChild(this.renderLayer_(l, i));
+                elm.appendChild(this.renderLayer_(l, i, lyr));
+            }
+        }
+    };
+
+    ol.control.LayerSwitcher.prototype.renderCheck_ = function(lyr, parentLayer) {
+        if (lyr.getLayers && !lyr.get('combine')) {
+            this.renderChecks_(lyr);
+        } else {
+            if(!lyr.get('visible')){
+                if(parentLayer.get('input_id') != null){
+                    document.getElementById(parentLayer.get('input_id')).checked=false;
+                }
+            }
+        }
+    };
+
+    ol.control.LayerSwitcher.prototype.renderChecks_ = function(lyr) {
+        var lyrs = lyr.getLayers().getArray().slice().reverse();
+        for (var i = 0, l; i < lyrs.length; i++) {
+            l = lyrs[i];
+            if (l.get('title')) {
+                this.renderCheck_(l, lyr)
             }
         }
     };
