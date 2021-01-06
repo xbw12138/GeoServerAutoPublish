@@ -3,7 +3,7 @@ from ColorMap import colorEntryMap
 import os
 
 
-service_url = 'http://wsl:6079/geoserver'
+service_url = 'http://wsl:8080/geoserver'
 username = 'admin'
 password = 'geoserver'
 geo = Geoserver(service_url=service_url, username=username, password=password)

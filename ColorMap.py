@@ -10,11 +10,16 @@ colorEntryMap = {
     'bufferstrip': {
         'type': 'ramp',
         '-': [
-            {'color': '#0000FF', 'quantity': '0', 'label': 'water', 'opacity': '0'},
-            {'color': '#ff8406', 'quantity': '1', 'label': 'city', 'opacity': '1'},
-            {'color': '#22dd00', 'quantity': '2', 'label': 'veg', 'opacity': '1'},
-            {'color': '#00ffe7', 'quantity': '3', 'label': 'soi', 'opacity': '1'},
-            {'color': '#00ff00', 'quantity': '4', 'label': 'crop', 'opacity': '1'}
+            # {'color': '#0000FF', 'quantity': '0', 'label': 'water', 'opacity': '0'},
+            # {'color': '#ff8406', 'quantity': '1', 'label': 'city', 'opacity': '1'},
+            # {'color': '#22dd00', 'quantity': '2', 'label': 'veg', 'opacity': '1'},
+            # {'color': '#00ffe7', 'quantity': '3', 'label': 'soi', 'opacity': '1'},
+            # {'color': '#00ff00', 'quantity': '4', 'label': 'crop', 'opacity': '1'}
+            {'color': '#0000FF', 'quantity': '0', 'label': '', 'opacity': '0'},
+            {'color': '#0000FF', 'quantity': '1', 'label': 'water', 'opacity': '1'},
+            {'color': '#ff8406', 'quantity': '2', 'label': 'city', 'opacity': '1'},
+            {'color': '#22dd00', 'quantity': '3', 'label': 'veg', 'opacity': '1'},
+            {'color': '#00ffe7', 'quantity': '4', 'label': 'soil', 'opacity': '1'}
         ]
     },
     'landcover': {

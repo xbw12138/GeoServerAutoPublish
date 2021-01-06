@@ -31,7 +31,8 @@
                 url: 'http://t0.tianditu.com/DataServer?T=cva_w&x={x}&y={y}&l={z}&tk=4f62e1d82bd46e2ff470b291c2260156',
                 name: '注记'
             },
-            river: "http://wsl:6075/basic_query/river_query/river_jjj"
+            river: "http://ldx.ecfun.cc:6075/basic_query/river_query/river_jjj",
+            outline: "http://ldx.ecfun.cc:6075/basic_query/region_query/province_pos_jjj"
         }
     </script>
 
@@ -123,7 +124,7 @@
             });
 
             // 这个默认边界不用改
-            map.getView().fit([116.72650652077483, 39.6152906023194, 117.18901780224532, 39.9895594296541], map.getSize());
+            map.getView().fit([115.00, 37.00, 118.00, 42.00], map.getSize());
 
             // 创建图层
             layerBase = getlayerBase(baseSource.base.url, baseSource.base.name);
@@ -132,9 +133,12 @@
             layerLabel = getlayerLabel(baseSource.label.url, baseSource.label.name);
             map.addLayer(layerLabel);
 
+            // 添加轮廓图层
+            layerOutline = getlayerOutline(baseSource.outline);
+            map.addLayer(layerOutline);
             // 添加多条河流图层
-            map.addLayer(getlayerRiver(baseSource.river));
-
+            layerRiver = getlayerRiver(baseSource.river)
+            map.addLayer(layerRiver);
             // 图层选择
             map.addControl(new ol.control.LayerSwitcher());
             // 图层事件
@@ -161,13 +165,60 @@
         function getlayerLabel(url, title) {
             return new ol.layer.Tile({
                 title: title,
-                visible: true,
+                visible: false,
                 source: new ol.source.XYZ({
                     url: url,
                     wrapX: false
                 })
             });
         }
+        // 获取轮廓绘制风格
+        function getOutlineStyle(title) {
+            return new ol.style.Style({
+                fill: new ol.style.Fill({ //矢量图层填充颜色，以及透明度
+                    color: 'rgba(255, 255, 255, 0.6)'
+                }),
+                stroke: new ol.style.Stroke({ //边界样式
+                    color: '#8AC8EE',
+                    width: 2,
+
+                }),
+                // text: new ol.style.Text({
+                //     text: title,
+                //     fill: new ol.style.Fill({ color: '#aa3300' }),
+                //     stroke: new ol.style.Stroke({ color: '#ffcc33', width: 2 })
+                // })
+            });
+        }
+        // 创建轮廓图层
+        function getlayerOutline(url) {
+            $.ajax({
+                url: url,
+                type: "GET",
+                dataType: "json",
+                async: false,
+                success: function (data) {
+                    layerBorderArray = []
+                    $.each(data.resData, function (i, item) {
+                        layerBorderArray.push(
+                            new ol.layer.Vector({
+                                title: item.properties.name,
+                                source: new ol.source.Vector({
+                                    features: (new ol.format.GeoJSON()).readFeatures(item)
+                                }),
+                                style: getOutlineStyle(item.properties.name)
+                            })
+                        )
+                    });
+                }
+            });
+
+            return new ol.layer.Group({
+                title: '京津冀轮廓',
+                layers: layerBorderArray
+            });
+        }
+
 
         // 获取河流绘制风格
         function getRiverStyle(title) {
@@ -182,6 +233,7 @@
                 //     stroke: new ol.style.Stroke({ color: '#ffcc33', width: 2 })
                 // })
             });
+
         }
 
         // 创建河流图层
@@ -288,19 +340,19 @@
                             //图标的url
                             src: 'assets/image/marker.png'
                         }),
-                    // text: new ol.style.Text({
-                    //     //位置
-                    //     textAlign: 'center',
-                    //     //基准线
-                    //     textBaseline: 'middle',
-                    //     //文字样式
-                    //     font: 'normal 14px 微软雅黑',
-                    //     //文本内容
-                    //     text: feature.get('name'),
-                    //     //文本填充样式（即文字颜色）
-                    //     fill: new ol.style.Fill({ color: '#aa3300' }),
-                    //     stroke: new ol.style.Stroke({ color: '#ffcc33', width: 2 })
-                    // })
+                    text: new ol.style.Text({
+                        //位置
+                        textAlign: 'center',
+                        //基准线
+                        textBaseline: 'middle',
+                        //文字样式
+                        font: 'normal 14px 微软雅黑',
+                        //文本内容
+                        text: feature.get('name'),
+                        //文本填充样式（即文字颜色）
+                        fill: new ol.style.Fill({ color: '#ffffff' }),
+                        stroke: new ol.style.Stroke({ color: '#ffcc33', width: 2 })
+                    })
                 });
             }
         }
@@ -319,9 +371,11 @@
                 var pixel = map.getEventPixel(e.originalEvent);
                 map.forEachFeatureAtPixel(pixel, function (feature) {
                     var coodinate = e.coordinate;
-                    content.innerHTML = '<p class="markerText">' + feature.values_.name + ' ' + feature.values_.id + '</p><br><p>' + coodinate + '</p>';
-                    overlay.setPosition(coodinate);
-                    map.addOverlay(overlay);
+                    if(feature.values_.id != undefined){
+                        content.innerHTML = '<p class="markerText">' + feature.values_.name + ' ' + feature.values_.id + '</p><br><p>' + coodinate + '</p>';
+                        overlay.setPosition(coodinate);
+                        map.addOverlay(overlay);
+                    }
                 });
             });
 
@@ -423,16 +477,16 @@
         function createLayer(workspace, layer, name, isGradient, markerData) {
             var mapSource = {
                 legend: {
-                    url: 'http://wsl:6079/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=application/json&STRICT=false&style=',
+                    url: 'http://ldx.ecfun.cc:6079/geoserver/wms?REQUEST=GetLegendGraphic&VERSION=1.0.0&FORMAT=application/json&STRICT=false&style=',
                     layer: workspace + ':' + layer,
                     isGradient: isGradient,
                 },
                 yaogan: {
-                    url: 'http://wsl:6079/geoserver/gwc/service/wmts',
+                    url: 'http://ldx.ecfun.cc:6079/geoserver/gwc/service/wmts',
                     name: name + layer,
                     layer: workspace + ':' + layer
                 },
-                bound: 'http://wsl:6075/public/geo_bound/bound?workspace=' + workspace + '&layer=' + layer
+                bound: 'http://ldx.ecfun.cc:6075/public/geo_bound/bound?workspace=' + workspace + '&layer=' + layer
             }
 
             // 清除图层
@@ -464,17 +518,49 @@
             layerMarker.setVisible(true);
         }
 
+        // 清除制定title图层
+        function deleteLayer(title) {
+            $.each(map.getLayers().getArray().slice().reverse(), function (i, lyr) {
+                if (lyr.get('title') === title) {
+                    map.removeLayer(lyr);
+                }
+            });
+        }
+
+        // 切换京津冀图层
+        function changeOutline(title, provinceName){
+            $.each(map.getLayers().getArray().slice().reverse(), function (i, lyr) {
+                if (lyr.get('title') === title) {
+                    $.each(lyr.getLayers().getArray().slice().reverse(), function (j, l) {
+                        l.setVisible(provinceName === '京津冀' || l.get('title') === provinceName);
+                    });
+                }
+            });
+        }
+
         // 切换数据
         function change1() {
             var name = '特征污染物';
             var workspace = 'inversion';
-            var indicator = 'BOD5';
+            var indicator = 'TU';
             var cityName = '三河市';
             var cityCode = '131082';
-            var time = '2019-11-04';
+            var time = '2020-09-19';
             var layer = cityCode + '_' + indicator + '_' + time;
             var isGradient = true;
-            var markerData = getMarker('http://wsl:6075/remote_sensing/water_pollution/search?belong=' + cityName + '&time=' + time + '&pageSize=30')
+            var markerData = getMarker('http://ldx.ecfun.cc:6075/remote_sensing/water_pollution/search?belong=' + cityName + '&time=' + time + '&pageSize=30')
+            // 切换京津冀轮廓
+            var provinceName = '京津冀';
+            // var provinceName = '河北省';
+            changeOutline('京津冀轮廓', provinceName)
+            // 删除京津冀轮廓
+            // deleteLayer('京津冀轮廓');
+
+            // 删除京津冀河流
+            deleteLayer('京津冀河流');
+            // 创建河流图层
+            // map.addLayer(getlayerRiver(baseSource.river)); // 带riverName参数指定查询河流，不带返回京津冀全部河流
+            map.addLayer(layerRiver); // 京津冀全部河流数据较大，返回慢，采用全局的变量，在初始化加载
             createLayer(workspace, layer, name, isGradient, markerData)
         }
         function change2() {
@@ -485,6 +571,14 @@
             var layer = cityCode + '_' + time;
             var isGradient = false;
             var markerData = []
+            // 切换京津冀轮廓
+            var provinceName = '河北省';
+            changeOutline('京津冀轮廓', provinceName)
+            // 删除京津冀河流
+            deleteLayer('京津冀河流');
+            // 创建河流图层
+            //map.addLayer(getlayerRiver(baseSource.river)); // 带riverName参数指定查询河流，不带返回京津冀全部河流
+            map.addLayer(layerRiver); // 京津冀全部河流数据较大，返回慢，采用全局的变量，在初始化加载
             createLayer(workspace, layer, name, isGradient, markerData)
         }
         function change3() {
@@ -495,24 +589,40 @@
             var layer = cityCode + '_' + time;
             var isGradient = false;
             var markerData = []
+            // 切换京津冀轮廓
+            var provinceName = '河北省';
+            changeOutline('京津冀轮廓', provinceName)
+            // 删除京津冀河流
+            deleteLayer('京津冀河流');
+            // 创建河流图层
+            //map.addLayer(getlayerRiver(baseSource.river)); // 带riverName参数指定查询河流，不带返回京津冀全部河流
+            map.addLayer(layerRiver); // 京津冀全部河流数据较大，返回慢，采用全局的变量，在初始化加载
             createLayer(workspace, layer, name, isGradient, markerData)
         }
         function change4() {
             var name = '河湖缓冲带';
             var workspace = 'bufferstrip';
-            var cityCode = '100000';
-            var river = 'BDG';
+            var cityCode = '110000';
+            var riverName = '密云水库';
+            var river = 'MYSK';
             var time = '2019';
             var layer = cityCode + '_' + river + '_' + time;
             var isGradient = false;
             var markerData = []
+            // 切换京津冀轮廓
+            var provinceName = '北京市';
+            changeOutline('京津冀轮廓', provinceName)
+            // 删除京津冀河流
+            deleteLayer('京津冀河流');
+            // 创建河流图层
+            map.addLayer(getlayerRiver(baseSource.river + '?riverName=' + riverName)); // 带riverName参数指定查询河流，不带返回京津冀全部河流
             createLayer(workspace, layer, name, isGradient, markerData)
         }
     </script>
 </head>
 
 <body>
-    <button onclick="change1()">特征污染物</button>
+    <button onclick="change1()">特征污染物-TU</button>
     <button onclick="change2()">水体面积&土地利用</button>
     <button onclick="change3()">黑臭水体</button>
     <button onclick="change4()">河湖缓冲带</button>
